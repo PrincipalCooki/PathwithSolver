@@ -15,54 +15,53 @@ import java.util.stream.IntStream;
 public class MyPathwidthSolver extends PathwidthSolver {
     private Graph g;
     private int n;
+        
+    private int[][] lower; //lower[v][i] is: L(v) = i
+    private int[][] upper;
+    private int[][] member; //member[v][x] is: x element [L(v), U(v)]
 
     public MyPathwidthSolver(Graph g){
         super(g);
         this.g = g;
         this.n = g.getNumNodes();
+        
+        lower = new int[n][n]; //lower[v][i] is: L(v) = i
+        upper = new int[n][n];
+        member = new int[n][n]; //member[v][x] is: x element [L(v), U(v)]
+
+        
     }
 
     @Override
     public Solution solve() {
         // TODO: Implement solution
         solution.setState(SolutionState.UNKNOWN);
-        System.out.println(this.g.getNumNodes());
-        if(g.getNumNodes() != 5) {
-            return solution;
-        }
-
-        System.out.println(solution.getInterval(0)[0]);
-
-        this.g.getEdgeIterator();
         
-        solution.print(System.out);
-
-        buildIntervals();
-        buildSATInstance();
-        solveSATInstance();
+        System.out.println("Hello world");
+        buildLiterals();
+        clauseConsistency();
 
         return solution;
     }
     private void buildLiterals() {
-        int[][] lower = new int[n][n]; //lower[v][i] is: L(v) = i
-        int[][] upper = new int[n][n];
-        int[][] member = new int[n][n]; //member[v][x] is: x element [L(v), U(v)]
-        
+        int counter = 1;
         for (int node = 0; node < n; node++) {
-            lower[node] = range(0, n);
-            upper[node] = range(n,2*n);
-            member[node] = range(2*n, 3*n);
+            for(int i = 0; i < n; i++) {
+                this.lower[node][i] = counter++;
+                upper[node][i] = counter++;
+                member[node][i] = counter++;
+            }
         }
     }
 
     // Clause for every node, that L(v) <= U(v) holds
-    // representation: -L || U 
+    // representation: L || U 
     private void clauseConsistency() {
-
-        for(int node = 0; node <= n; node++) {
-            for(int lower = 0; lower <=n, lower++) {
-                for(int upper = lower; upper <= n, upper++) {
-                    int literalL = 
+        for(int node = 0; node < n; node++) {
+            for(int low = 0; low <n; low++) {
+                for(int up = low; up < n; up++) {
+                    VecInt clause = new VecInt(new int[] {lower[node][low], upper[node][up]});
+                    solver.addClause(clause);
                 }
             }
         }
@@ -83,65 +82,6 @@ public class MyPathwidthSolver extends PathwidthSolver {
             GraphEdge edge = edgeIterator.next();
 
         }
-    }
-
-    private void buildIntervals() {
-        Iterator<GraphEdge> edgeIterator = g.getEdgeIterator();
-        float min = 1;
-        float max = 2;
-        while (edgeIterator.hasNext()) {
-            GraphEdge edge = edgeIterator.next();
-            int n0 = edge.getEndpoint1();
-            int n1 = edge.getEndpoint2();
-            
-            float n0_left = solution.getInterval(n0)[0];
-            float n0_right = solution.getInterval(n0)[1];
-
-            float n1_left = solution.getInterval(n1)[0];
-            float n1_right = solution.getInterval(n1)[1];
-
-            n1_left = (n1_left == 0) ? n0_right : n1_left;
-
-            solution.setInterval(n0, n0_left, n0_right + 1);
-            solution.setInterval(n1, n1_left, n0_right + 1);
-
-        }
-    }
-
-    // literals: positive inside interval, negativ outside interval
-    private void buildSATInstance() {
-        
-        for (int interval_index = 0; interval_index < g.getNumNodes(); interval_index++) {
-            float[] interval = solution.getInterval(interval_index);
-            
-            int left = Math.round(interval[0]);
-            int right = Math.round(interval[1]);
-
-            int[] negativs = addAll(
-                scalarMult(-1, range(0, left)), scalarMult(-1, range(right, n))
-                );
-            int[] positives = range(right, left);
-
-            VecInt clause = new VecInt(addAll(negativs, positives));
-            solver.addClause(clause);
-        }
-        int k = g.getPathwidth();
-        solver.addAtMost(new VecInt(range(0, n)), k);
-    }
-
-        
-    private boolean solveSATInstance() {
-        boolean satisfiable = solver.isSatisfiable();
-        
-        if (satisfiable) {
-            System.out.println("Das Problem ist erfüllbar!");
-
-            int[] solution = solver.model();  
-            System.out.println("Lösungsbelegung: " + Arrays.toString(solution));
-        } else {
-            System.out.println("Das Problem ist nicht erfüllbar.");
-        }
-        return satisfiable;
     }
 
     private int[] range(int a, int b) {
