@@ -57,11 +57,17 @@ public class MyPathwidthSolver extends PathwidthSolver {
     // Clause for every node, that L(v) <= U(v) holds
     // representation: L || U 
     private void clauseConsistency() {
+        
         for(int node = 0; node < n; node++) {
             for(int low = 0; low <n; low++) {
                 for(int up = low; up < n; up++) {
                     VecInt clause = new VecInt(new int[] {lower[node][low], upper[node][up]});
-                    solver.addClause(clause);
+                    try {
+                        solver.addClause(clause);
+                    } catch (ContradictionException e) {
+                        System.out.println("Widerspruch bei der Klausel: " + lower[node][low] + ", " + upper[node][up]);
+                    }
+                    // solver.addClause(clause);
                 }
             }
         }
