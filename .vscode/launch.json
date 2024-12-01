@@ -1,0 +1,11 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "MyTest",
+            "request": "launch",
+            "mainClass": "MyTest",
+            "projectName": "Pathwidth-1.0_8c33ff4b"
+        }
+    ]
+}
