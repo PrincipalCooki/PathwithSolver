@@ -2,6 +2,7 @@ import edu.kit.iti.formal.pathwidth.*;
 
 import java.util.Iterator;
 
+import org.sat4j.core.Vec;
 import org.sat4j.core.VecInt;
 import org.sat4j.specs.ContradictionException;
 import org.sat4j.specs.TimeoutException;
@@ -60,12 +61,14 @@ public class MyPathwidthSolver extends PathwidthSolver {
 
         for(int x = 0; x < n; x++) {
             VecInt clause = new VecInt();
+            System.out.println("x: " + x);
             for(int node = 0; node < n; node++) {
                 clause.push(member[node][x]);
+                System.out.println("member: " + (member[node][x] + 1) );
             }
             
             try {
-                solver.addAtMost(clause, k);
+                solver.addAtMost(clause, 1);
             } catch (ContradictionException e) {
                 System.out.println("Pathwidth Condition error");
             }
@@ -78,7 +81,28 @@ public class MyPathwidthSolver extends PathwidthSolver {
                 solution.setState(SolutionState.SAT);
                 int[] model = solver.model();
                 for(int i = 0; i < model.length; i++) {
-                    // System.out.println(model[i]);
+                    System.out.println(model[i]);
+                }
+                System.out.println("Member literals");
+                for(int node = 0; node < n; node++) {
+                    System.out.println("node: " + node);
+                    for(int i = 0; i < n; i++) {
+                        System.out.println(model[member[node][i]-1]);
+                    }
+                }
+                System.out.println("Lower literals");
+                for(int node = 0; node < n; node++) {
+                    System.out.println("node: " + node);
+                    for(int i = 0; i < n; i++) {
+                        System.out.println(model[lower[node][i]-1]);
+                    }
+                }
+                System.out.println("Upper literals");
+                for(int node = 0; node < n; node++) {
+                    System.out.println("node: " + node);
+                    for(int i = 0; i < n; i++) {
+                        System.out.println(model[upper[node][i]-1]);
+                    }
                 }
                 return model;
             } else {
@@ -122,7 +146,7 @@ public class MyPathwidthSolver extends PathwidthSolver {
     // L(v) = i => U(v) = i:n 
     // representation: -L(v) =i || U = i:n || -L(v) = 1, ...
     // one lower bound must be set: {L(v) = 0, L(v) = 1,... ,L(v) = n-1}   
-    // and only one of them can be true: addAtMost(L(v) =0, ...1) 
+    // and only one of them can be true: addExactly(L(v) =0, ...1) 
     private void clauseConsistency() {
         try {
             for(int node = 0; node < n; node++) {
@@ -131,8 +155,14 @@ public class MyPathwidthSolver extends PathwidthSolver {
                 for (int low = 0; low < n; low++) {
                     clause_set_lower_bound.push(lower[node][low]);
                 }
-                solver.addAtMost(clause_set_lower_bound, 1);
-                solver.addClause(clause_set_lower_bound);
+                solver.addExactly(clause_set_lower_bound, 1);
+
+                VecInt clause_set_upper_bound = new VecInt();
+                for (int up = 0; up < n; up++) {
+                    clause_set_upper_bound.push(upper[node][up]);
+                }
+                solver.addExactly(clause_set_upper_bound, 1);
+
                 for(int low = 0; low <n; low++) {
                     VecInt clause = new VecInt(new int[] {-lower[node][low]});
                     for(int up = low + 1; up < n; up++) {
@@ -147,31 +177,70 @@ public class MyPathwidthSolver extends PathwidthSolver {
 
     }
 
-    // L(v) < x: L(v) = 0, L(v) = 1,... ,L(v) = x 
-    // U(v) > x: U(v) = x, U(v) = x+1,... ,U(v) = n-1 
-    // M(v,x) => L(v) < x && U(v) > x
-    // (M(v,x) => L(v) < x ) && (M(v,x) => U(v) > x)
-    // {-M(v,x) || L(v) < x} && {-M(v,x) || U(v) > x}
+
+    // WRONG: -c must be rewritten with de morgan
+    // b: L(v) < x: L(v) = 0, L(v) = 1,... ,L(v) = x 
+    // c: U(v) > x: U(v) = x, U(v) = x+1,... ,U(v) = n-1 
+    // M(v,x) <=> (L(v) <= x && U(v) >= x)
+    // a <=> (b && c)
+    // (a => (b && c) ) && ((b && c) => a)
+    // (-a || (b && c)) && (-(b && c) || a)
+    // (-a || b) && (-a || c) && (-b || -c || a)
     private void clauseMembership() {
         for(int node = 0; node < n; node++) {
             for(int x = 0; x < n; x++) {
-                VecInt clause = new VecInt();
-                clause.push(-member[node][x]);
-                for(int low = 0; low < x; low++) {
-                    clause.push(lower[node][low]);
+
+                VecInt clause_ab = new VecInt();
+                VecInt clause_ac = new VecInt();
+                VecInt clause_abc = new VecInt();
+
+                VecInt clause_a_neg = new VecInt();
+                clause_a_neg.push(-member[node][x]);
+                VecInt clause_a_pos= new VecInt();
+                clause_a_pos.push(member[node][x]);
+
+
+                clause_ab.pushAll(clause_a_neg);
+                clause_ac.pushAll(clause_a_neg);
+                clause_abc.pushAll(clause_a_pos);
+
+                
+                VecInt clause_b_pos = new VecInt();
+                VecInt clause_b_neg = new VecInt();
+                VecInt clause_c_pos = new VecInt();
+                VecInt clause_c_neg = new VecInt();
+                
+                for(int low = 0; low <= x; low++) {
+                    clause_b_pos.push(lower[node][low]);
+                    clause_b_neg.push(-lower[node][low]);
                 }
-                try {
-                    solver.addClause(clause);
-                } catch (ContradictionException e) {
-                    System.out.println("Membership Clause error");
-                }
-                clause = new VecInt();
-                clause.push(-member[node][x]);
+
                 for(int up = x; up < n; up++) {
-                    clause.push(upper[node][up]);
+                    clause_c_pos.push(upper[node][up]);
+                    clause_c_neg.push(-upper[node][up]);
                 }
+
+                System.out.println("critical ones: ");
+                System.out.println(clause_b_pos.toString());
+                System.out.println(clause_c_pos.toString());
+                System.out.println(clause_a_pos.toString());
+
+                clause_ab.pushAll(clause_b_pos);
+                clause_ac.pushAll(clause_c_pos);
+                clause_abc.pushAll(clause_b_neg); 
+                clause_abc.pushAll(clause_c_neg); 
+               
+                // (-a || b) && (-a || c) && (-b || -c || a)
+                if (member[node][x] == 9) {
+                    System.out.println("clause (-a || b): " + clause_ab.toString());
+                    System.out.println("clause (-a || c): " + clause_ac.toString());
+                    System.out.println("clause (-b || -c || a): " + clause_abc.toString());
+                }
+
                 try {
-                    solver.addClause(clause);
+                    solver.addClause(clause_ab);
+                    solver.addClause(clause_ac);
+                    solver.addClause(clause_abc);
                 } catch (ContradictionException e) {
                     System.out.println("Membership Clause error");
                 }
@@ -179,6 +248,9 @@ public class MyPathwidthSolver extends PathwidthSolver {
             }
         }
     }
+
+    //New try:
+    // 
 
     // e = uv:  L(v) < U(u) && L(u) < L(v) || U(v) < U(u) && L(u) < U(v) 
     //                a     &&      b      ||      c      &&      d
