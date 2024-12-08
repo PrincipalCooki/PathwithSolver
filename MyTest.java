@@ -111,7 +111,7 @@ public class MyTest implements Runnable {
             //My code:
             File[] allRiddles = findRiddles();
 
-            File[] fileList = Arrays.copyOfRange(allRiddles, 9, 10);
+            File[] fileList = Arrays.copyOfRange(allRiddles, 8,9);
 
 
             all = fileList.length;
